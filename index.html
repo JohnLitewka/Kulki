@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    .cell {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      border: 1px solid black;
+    }
+
+    body {
+      text-align: center;
+      line-height: 3em
+    }
+
+    .circle {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid black;
+      width: 30px;
+      height: 30px;
+    }
+
+    .selectedCircle {
+      transform: translate(-5px, -5px);
+      width: 40px;
+      height: 40px;
+    }
+
+    .preview {
+      /* position:absolute; */
+      float: left;
+      width: 30px;
+      height: 30px;
+      margin-top: 20px;
+      margin-left: 10px;
+      border-radius: 50%;
+      border: 1px solid black;
+    }
+
+    #next {
+      position: relative;
+      left: 500px;
+      height: 50px;
+      width: 250px;
+    }
+
+    #points {
+      position: absolute;
+      top: 150px;
+      left: 500px;
+      height: 50px;
+      width: 250px;
+    }
+
+
+    .outset {
+      position: relative;
+      width: 459px;
+      height: 459px;
+    }
+
+    #end {
+      display: none;
+      margin: 0 auto;
+      position: relative;
+      top: 50px;
+      height: 150px;
+      width: 500px;
+      background-color: red;
+    }
+  </style>
+  <script>
+    let tabA = []
+    let tabB = []
+    let path = []
+    let selected = []
+    var cpath = []
+    let fields = []
+    let points = 0
+    let counter = 0
+    let colors = ['Black', 'Blue', 'Yellow', 'White', 'Green', 'Orange', 'red']
+    let next = new Array(3)
+    let started = false
+    let found = false
+    let clicked = false
+    let freeMove = false
+    document.addEventListener("DOMContentLoaded", (event) => {
+      game(12)
+
+      function game(n) {
+
+        createGrid()
+        addCircles()
+
+        // Tworzenie grida & dodawanie pol do arraya fields(obj), tworzenie tabA i tabB
+        function createGrid() {
+          document.getElementById('end').style.display = 'none'
+          document.getElementById('next').style.display = 'block'
+          document.getElementById('points').style.display = 'block'
+          outset = document.createElement('div')
+          outset.className = 'outset'
+          document.body.appendChild(outset)
+          document.getElementById('pt').innerText = "Points : " + points
+          for (let i = 0; i < n; i++) {
+            tabA[i] = [];
+            tabB[i] = []
+            fields[i] = []
+            for (let j = 0; j < n; j++) {
+              fields[i][j] = new field(i, j)
+              tabA[i][j] = 0
+              tabB[i][j] = []
+            }
+          }
+          // kolory przy inicjacji
+          for (let i = 0; i < 3; i++) {
+            next[i] = colors[Math.floor(Math.random() * 7)]
+          }
+        }
+
+
+        // Obiekt pola
+        function field(i, j) {
+          this.obstacle = false
+          this.i = i
+          this.j = j
+          this.id = i + '_' + j
+          this.div = document.createElement('div')
+          this.div.classList.add('cell')
+          this.div.setAttribute('style', 'left:' + (j * 51) + 'px;top:' + (i * 51) + 'px;')
+          this.div.id = this.id
+          outset.appendChild(this.div)
+          this.div.addEventListener('click', listenerek)
+          this.div.addEventListener('mouseover', mouseOver)
+          this.div.addEventListener('mouseout', mouseOut)
+          this.circ = null
+          this.setObstacle = function (color) {
+            this.div.removeEventListener('mouseover', mouseOver)
+            this.div.removeEventListener('mouseout', mouseOut)
+            this.div.removeEventListener('click', listenerek)
+            this.circ = document.createElement('div')
+            this.circ.classList.add('circle')
+            this.circ.color = color
+            let id = 'c' + this.i + '_' + this.j
+            this.circ.id = id
+            this.circ.setAttribute('style', 'left:' + ((j * 51) + 10) + 'px;top:' + ((i * 51) + 10) + 'px;')
+            this.circ.style.backgroundColor = color
+            outset.appendChild(this.circ)
+            this.circ.addEventListener('click', circListener)
+            this.obstacle = true
+            this.circ.del = false
+          }
+          this.moveObstacle = async function (source) {
+            source = source.split('_')
+            let ball = document.getElementById('c' + source[0] + '_' + source[1])
+            ball.classList.remove('selectedCircle')
+            let coords = []
+            let vects = []
+            let i = 0
+            do {
+              if (cpath[i + 1].split('_')[0] - cpath[i].split('_')[0] > 0)
+                vects.push('d')
+              else if (cpath[i + 1].split('_')[0] - cpath[i].split('_')[0] < 0)
+                vects.push('u')
+              else if (cpath[i + 1].split('_')[1] - cpath[i].split('_')[1] > 0)
+                vects.push('r')
+              else if (cpath[i + 1].split('_')[1] - cpath[i].split('_')[1] < 0)
+                vects.push('l')
+              i++
+            } while (i <= cpath.length - 2)
+            i = 0
+            animation()
+
+            async function animation() {
+              switch (vects[i]) {
+                case 'u':
+                  for (let i = 0; i < 10; i++) {
+                    await sleep(10)
+                    ball.style.top = ball.style.top.slice(0, -2) - 5.1 + 'px'
+                  }
+                  break;
+                case 'd':
+                  for (let i = 0; i < 10; i++) {
+                    await sleep(10)
+                    ball.style.top = parseFloat(ball.style.top.slice(0, -2)) + 5.1 + 'px'
+                  }
+                  break;
+                case 'l':
+                  for (let i = 0; i < 10; i++) {
+                    await sleep(10)
+                    ball.style.left = ball.style.left.slice(0, -2) - 5.1 + 'px'
+                  }
+                  break;
+                case 'r':
+                  for (let i = 0; i < 10; i++) {
+                    await sleep(10)
+                    ball.style.left = parseFloat(ball.style.left.slice(0, -2)) + 5.1 + 'px'
+                  }
+                  break;
+              }
+              i++
+              if (i <= vects.length - 1) requestAnimationFrame(animation)
+            }
+            this.div.removeEventListener('mouseover', mouseOver)
+            this.div.removeEventListener('mouseout', mouseOut)
+            this.div.removeEventListener('click', listenerek)
+            let id = 'c' + this.i + '_' + this.j
+            ball.id = id
+            this.circ = ball
+            this.obstacle = true
+            fields[source[0]][source[1]].removeObstacle()
+          }
+          this.removeObstacle = function () {
+            this.div.addEventListener('click', listenerek)
+            this.div.addEventListener('mouseover', mouseOver)
+            this.div.addEventListener('mouseout', mouseOut)
+            this.obstacle = false
+            this.circ = null
+          }
+          this.removeCircle = function () {
+            let toscrap = document.getElementById('c' + i + '_' + j)
+            toscrap.parentNode.removeChild(toscrap)
+          }
+        }
+
+
+        // funkcja wyszukiwania sciezki
+        function szukaj() {
+          //wyciaganie pol z dana zawartoscia(S,1,2,3,4)
+          function getPos(el) {
+            let poss = new Array()
+            for (let i = 0; i < tabA.length; i++)
+              if (tabA[i].indexOf(el) != -1)
+                for (let j = 0; j < tabA.length; j++)
+                  if (tabA[i][j] == el) poss.push({
+                    c: j,
+                    r: i
+                  })
+            return poss
+          }
+
+          started = false
+          let i = 0
+          do {
+            if (i == 0) {
+              var arr = getPos('S')
+              if (arr.length == 0) {
+                found = false
+                break
+              }
+            } else {
+              var arr = getPos(i)
+              if (arr.length == 0) {
+                found = false
+                break
+                console.log('nice nie znalazl')
+                path = []
+              }
+            }
+            arr.forEach(element => {
+              if ((tabA[element.r - 1]) && (!found)) {
+                if (tabA[element.r - 1][element.c] == '0') {
+                  tabA[element.r - 1][element.c] = i + 1
+                  if (tabB[element.r][element.c].length == 0) {
+                    tabB[element.r - 1][element.c].push(element.r + '_' + element.c)
+                  } else {
+                    tabB[element.r - 1][element.c] = tabB[element.r][element.c].slice(0)
+                    tabB[element.r - 1][element.c].push(element.r + '_' + element.c)
+                  }
+                } else if (tabA[element.r - 1][element.c] == 'M') {
+                  found = true
+                  path = tabB[element.r][element.c]
+                  path.push(element.r + '_' + element.c)
+                  path.push(element.r - 1 + '_' + element.c)
+                }
+              }
+
+              if ((tabA[element.r + 1]) && (!found)) {
+                if (tabA[element.r + 1][element.c] == '0') {
+                  tabA[element.r + 1][element.c] = i + 1
+                  if (tabB[element.r][element.c].length == 0) {
+                    tabB[element.r + 1][element.c].push(element.r + '_' + element.c)
+                  } else {
+                    tabB[element.r + 1][element.c] = tabB[element.r][element.c].slice(0)
+                    tabB[element.r + 1][element.c].push(element.r + '_' + element.c)
+                  }
+                } else if (tabA[element.r + 1][element.c] == 'M') {
+                  found = true
+                  path = tabB[element.r][element.c]
+                  path.push(element.r + '_' + element.c)
+                  path.push(element.r + 1 + '_' + element.c)
+                }
+              }
+
+              if ((typeof tabA[element.r][element.c - 1] !== 'undefined') && (!found)) {
+                if (tabA[element.r][element.c - 1] == '0') {
+                  tabA[element.r][element.c - 1] = i + 1
+                  if (tabB[element.r][element.c].length == 0) {
+                    tabB[element.r][element.c - 1].push(element.r + '_' + element.c)
+                  } else {
+                    tabB[element.r][element.c - 1] = tabB[element.r][element.c].slice(0)
+                    tabB[element.r][element.c - 1].push(element.r + '_' + element.c)
+                  }
+
+                } else if (tabA[element.r][element.c - 1] == 'M') {
+                  found = true
+                  path = tabB[element.r][element.c]
+                  path.push(element.r + '_' + element.c)
+                  path.push(element.r + '_' + (element.c - 1))
+                }
+              }
+
+              if ((typeof tabA[element.r][element.c + 1] !== 'undefined') && (!found)) {
+                if (tabA[element.r][element.c + 1] == '0') {
+                  tabA[element.r][element.c + 1] = i + 1
+                  if (tabB[element.r][element.c].length == 0) {
+                    tabB[element.r][element.c + 1].push(element.r + '_' + element.c)
+                  } else {
+                    tabB[element.r][element.c + 1] = tabB[element.r][element.c].slice(0)
+                    tabB[element.r][element.c + 1].push(element.r + '_' + element.c)
+                  }
+
+                } else if (tabA[element.r][element.c + 1] == 'M') {
+                  found = true
+                  path = tabB[element.r][element.c]
+                  path.push(element.r + '_' + element.c)
+                  path.push(element.r + '_' + (element.c + 1))
+                }
+              }
+            })
+            i = i + 1
+          } while (!found) {
+            started = true
+          }
+
+        }
+
+
+        // klikniecie mysza na puste pole
+        async function listenerek() {
+          if (started) {
+            let i = this.id.split('_')[0]
+            let j = this.id.split('_')[1]
+            tabA[i][j] = 'M'
+            szukaj()
+            if (found) {
+              freeMove = false
+              started = false
+              clicked = true
+              fields[i][j].moveObstacle(path[0])
+              tabA[i][j] = 'X'
+              selected = []
+              path.forEach(element => {
+                document.getElementById(element).style.backgroundColor = '#FFA9D1'
+              })
+              await sleep(path.length * 110)
+              path.forEach(element => {
+                document.getElementById(element).style.backgroundColor = 'white'
+              })
+              check()
+              if (!freeMove) addCircles()
+              clicked = false
+              found = false
+              freeMove = false
+              clear()
+              path = []
+            }
+          }
+        }
+
+
+        // listener divow z kolkami
+        function circListener() {
+          // zabezpieczenie przed wieloma kliknieciami
+          if (!clicked) {
+            //sprawdzenie czy kliknieto w element z jedna klasa (circle)
+            if (document.getElementById(this.id).classList.length == 1) {
+              started = true
+              //sprawdzenie czy zostalo wczesniej zaznaczone jakies kolko
+              if (selected.length == 0) {
+                document.getElementById(this.id).classList.add('selectedCircle')
+                selected.push(this.id)
+              } else {
+                selected.push(this.id)
+                document.getElementById(selected[0]).classList.remove('selectedCircle')
+                document.getElementById(this.id).classList.add('selectedCircle')
+                let idik = convertCircleId(selected[0])
+                tabA[idik[0]][idik[1]] = 'X'
+                selected.shift()
+                path.forEach(element => {
+                  document.getElementById(element).style.backgroundColor = 'white'
+                })
+                clear()
+                path = []
+              }
+              //odklikniecie kolka poprzez klikniecie go jeszcze raz
+            } else if (document.getElementById(this.id).classList.length == 2) {
+              document.getElementById(this.id).classList.remove('selectedCircle')
+              selected.shift()
+              started = false
+              path.forEach(element => {
+                document.getElementById(element).style.backgroundColor = 'white'
+              })
+              clear()
+              path = []
+            }
+          }
+        }
+
+
+        // funkcja czyszczenia tablic
+        function clear() {
+          for (let i = 0; i < n; i++) {
+            tabB[i] = []
+            for (let j = 0; j < n; j++)
+              tabB[i][j] = []
+          }
+
+          for (let i = 0; i < fields.length; i++) {
+            for (let j = 0; j < fields.length; j++) {
+              if (fields[i][j].obstacle == true) tabA[i][j] = 'X'
+              else tabA[i][j] = 0
+            }
+          }
+        }
+
+
+        // najechanie mysza na puste pole
+        function mouseOver() {
+          //malowanie pol tylko wtedy gdy zostanie zaznaczona jakas kulka
+          if (started) {
+            console.log('over')
+            let idik = convertCircleId(selected[0])
+            tabA[idik[0]][idik[1]] = 'S'
+            tabA[this.id.split('_')[0]][this.id.split('_')[1]] = 'M'
+            path.forEach(element => {
+              document.getElementById(element).style.backgroundColor = 'white'
+            })
+            szukaj()
+            cpath = []
+            path.forEach(element => {
+              cpath.push(element)
+              document.getElementById(element).style.backgroundColor = '#FFA9D1'
+            })
+            found = false
+
+          }
+        }
+
+
+        // zjechanie mysza z pustego pola
+        function mouseOut() {
+          tabA[this.id.split('_')[0]][this.id.split('_')[1]] = 0
+          clear()
+        }
+
+
+        // funkcja dodania kulek
+        function addCircles() {
+          counter = 0
+          countCircs()
+          if (counter == 80) var toAdd = 1
+          else if (counter == 79) var toAdd = 2
+          else var toAdd = 3
+          var i = 0;
+          while (i < toAdd) {
+            let h = Math.floor(Math.random() * fields.length)
+            let j = Math.floor(Math.random() * fields.length)
+            if (!fields[j][h].obstacle) {
+              fields[j][h].setObstacle(next[i])
+              tabA[fields[j][h].i][fields[j][h].j] = 'X'
+              i++
+            }
+          }
+          check()
+          counter = 0
+          countCircs()
+          if (counter == 81) end()
+          for (let i = 0; i < 3; i++) {
+            next[i] = colors[Math.floor(Math.random() * 7)]
+            document.getElementById('color' + i).style.backgroundColor = next[i]
+          }
+        }
+
+
+        function countCircs() {
+          fields.forEach(el => {
+            el.forEach(el => {
+              if (el.circ) counter++
+            })
+          })
+        }
+
+
+        // konwersja id kulki na id pola c1_9 -> 1_9
+        function convertCircleId(tab) {
+          tab = tab.split('_')
+          tab[0] = tab[0].slice(1)
+          return tab
+        }
+
+        function sleep(ms) {
+          return new Promise(resolve => setTimeout(resolve, ms))
+        }
+
+        function check() {
+          for (let i = 0; i < 9; i++) {
+            for (let j = 4; j >= 0; j--) {
+              if (fields[j][i].circ) {
+                let color = fields[j][i].circ.color
+                let tab = []
+                for (let k = j; k < 9; k++) {
+                  tab.push(fields[k][i])
+                  if (tab.length >= 5) {
+                    if (tab.every((el) => el.circ)) {
+                      if (tab.every((el) => el.circ.color == color)) {
+                        tab.forEach(el => el.circ.del = true)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          for (let i = 0; i < 9; i++) {
+            for (let j = 4; j >= 0; j--) {
+              if (fields[i][j].circ) {
+                let color = fields[i][j].circ.color
+                let tab = []
+                for (let k = j; k < 9; k++) {
+                  tab.push(fields[i][k])
+                  if (tab.length >= 5) {
+                    if (tab.every((el) => el.circ)) {
+                      if (tab.every((el) => el.circ.color == color)) {
+                        tab.forEach(el => el.circ.del = true)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          for (let i = 4; i >= 0; i--) {
+            for (let j = 4; j >= 0; j--) {
+              if (fields[i][j].circ) {
+                let color = fields[i][j].circ.color
+                let tab = []
+                if (i > j) {
+                  var dom = i
+                } else var dom = j
+                for (let k = 0; k < 9 - dom; k++) {
+                  tab.push(fields[i + k][j + k])
+                  if (tab.length >= 5) {
+                    if (tab.every((el) => el.circ)) {
+                      if (tab.every(el => el.circ.color == color)) {
+                        tab.forEach(el => el.circ.del = true)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          for (let i = 4; i < 9; i++) {
+            for (let j = 4; j >= 0; j--) {
+              if (fields[i][j].circ) {
+                let color = fields[i][j].circ.color
+                let tab = []
+                if (8 - i > j) {
+                  var dom = 8 - i
+                } else var dom = j
+                // let topVal = ((grid - i - 1) > j) ? (grid - i - 1) : j
+                for (let k = 0; k < 9 - dom; k++) {
+                  tab.push(fields[i - k][j + k])
+                  if (tab.length >= 5) {
+                    if (tab.every((el) => el.circ)) {
+                      if (tab.every(el => el.circ.color == color)) {
+                        tab.forEach(el => el.circ.del = true)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          for (let i = 0; i < fields.length; i++) {
+            for (let j = 0; j < fields[i].length; j++) {
+              if (fields[i][j].circ && fields[i][j].circ.del) {
+                fields[i][j].removeObstacle()
+                fields[i][j].removeCircle()
+                freeMove = true
+                points++
+                document.getElementById('pt').innerText = "Points : " + points
+              }
+            }
+          }
+
+
+
+        }
+
+        function end() {
+          document.getElementById('next').style.display = 'none'
+          document.getElementById('points').style.display = 'none'
+          let a = document.getElementsByClassName('outset')
+          a[0].parentNode.removeChild(a[0])
+          document.getElementById('end').style.display = 'block'
+          document.getElementById('ok').addEventListener('click', endzik)
+          document.getElementById('communicate').innerText = "Udalo Ci sie uzyskac : " + points + "pkt"
+
+          function endzik() {
+            document.getElementById('ok').removeEventListener('click', endzik)
+            game(9)
+          }
+        }
+
+      }
+    })
+  </script>
+</head>
+
+<body>
+  <div id="next">
+    <p>Next:</p>
+    <div id="color0" class="preview"></div>
+    <div id="color1" class="preview"></div>
+    <div id="color2" class="preview"></div>
+  </div>
+  <div id="points">
+    <p id="pt">Points : </p>
+  </div>
+  <div id="end">
+    <h1 id="communicate">asdasf</h1>
+    <button type="button" name="button" id="ok">Ok</button>
+  </div>
+</body>
+
+</html>
